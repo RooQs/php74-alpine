@@ -1,0 +1,24 @@
+name: alpine-probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Host connectivity to Alpine 3.16 mirrors
+        run: |
+          for u in \
+            https://dl-cdn.alpinelinux.org/alpine/v3.16/main/x86_64/APKINDEX.tar.gz \
+            https://archive.alpinelinux.org/alpine/v3.16/main/x86_64/APKINDEX.tar.gz \
+            https://mirrors.aliyun.com/alpine/v3.16/main/x86_64/APKINDEX.tar.gz \
+            https://mirrors.ustc.edu.cn/alpine/v3.16/main/x86_64/APKINDEX.tar.gz \
+            https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/APKINDEX.tar.gz; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "$u" 2>&1 || true)
+            echo "$code  $u"
+          done
+
+      - name: Inside php base image
+        run: |
+          docker run --rm php:7.4.33-fpm-alpine3.16 sh -c 'cat /etc/apk/repositories; echo ---; wget -q -O /dev/null https://dl-cdn.alpinelinux.org/alpine/v3.16/main/x86_64/APKINDEX.tar.gz && echo cdn-ok || echo cdn-fail; apk update 2>&1 | tail -n 5'
