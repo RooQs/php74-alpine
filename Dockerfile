@@ -9,6 +9,8 @@ ARG MAKE_JOBS
 COPY patches/7.4-CVE-2026-109618-109619.patch /usr/src/cve.patch
 
 RUN set -eux; \
+    sed -i 's|dl-cdn.alpinelinux.org|archive.alpinelinux.org|g' /etc/apk/repositories; \
+    apk add --no-cache libedit; \
     apk add --no-cache --virtual .fix-build-deps \
         $PHPIZE_DEPS patch \
         curl-dev libxml2-dev openssl-dev sqlite-dev libedit-dev oniguruma-dev \
