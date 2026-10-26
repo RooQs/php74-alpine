@@ -64,16 +64,26 @@ jobs:
       - name: Create multi-arch manifest
         run: |
           IMG=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
-          docker buildx imagetools create -t "$IMG" \
-            "$IMG-amd64" "$IMG-arm64"
+          docker buildx imagetools create -t "$IMG" "$IMG-amd64" "$IMG-arm64"
+
+      - name: Check manifest platforms
+        run: |
+          IMG=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+          docker buildx imagetools inspect "$IMG"
+          docker buildx imagetools inspect "$IMG" | grep -q 'linux/amd64'
+          docker buildx imagetools inspect "$IMG" | grep -q 'linux/arm64'
 
   verify:
     needs: merge
-    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: docker/login-action@v3
         with:
@@ -83,17 +93,17 @@ jobs:
       - name: Verify ${{ matrix.arch }} image
         run: |
           IMG=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
-          docker pull --platform linux/${{ matrix.arch }} "$IMG"
-          docker run --rm --platform linux/${{ matrix.arch }} "$IMG" php -r 'echo ini_get("max_multipart_body_parts"), PHP_EOL;' | grep -qx -- '-1'
-          docker run --rm --platform linux/${{ matrix.arch }} "$IMG" php-fpm -t
-          docker run --rm --platform linux/${{ matrix.arch }} "$IMG" php -m | grep -Eqi 'mysqli|pdo_mysql|mbstring|curl|openssl|zlib|sqlite|sodium'
+          docker pull "$IMG"
+          docker run --rm "$IMG" php -r 'echo ini_get("max_multipart_body_parts"), PHP_EOL;' | grep -qx -- '-1'
+          docker run --rm "$IMG" php-fpm -t
+          docker run --rm "$IMG" php -m | grep -Eqi 'mysqli|pdo_mysql|mbstring|curl|openssl|zlib|sqlite|sodium'
 
   trivy:
     needs: merge
     runs-on: ubuntu-24.04
     steps:
       - name: Trivy scan (report only)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
           format: table
